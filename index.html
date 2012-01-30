@@ -1,0 +1,322 @@
+<!doctype html>
+<html> 
+    <head>
+        <script type="text/javascript"
+            src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js">
+        </script>
+        <meta name="viewport" content="user-scalable=no, width=device-width" />
+		<style type="text/css"><!--
+		body {
+			text-align: center;
+			background-color: #ddd; /* Background color */
+			color: #222;            /* Foreground color used for text */
+			font-family: Helvetica; 
+			font-size: 14px;
+			margin: 0;              /* Amount of negative space around the outside of the body */
+			padding: 0;             /* Amount of negative space around the inside of the body */
+		}
+		#location {
+			text-shadow: 0px 1px 0px #fff;
+			text-align: center;
+			margin: 0;
+			padding: 0;
+			background-color: #ccc;
+			border-bottom: 1px solid #666;
+			color: #222;
+			display: block;
+			font-size: 18px;
+			font-weight: bold;
+			padding: 10px 0;
+			text-align: center;
+			text-decoration: none;
+		}
+		#weather {
+			text-align: left;
+			margin-left: 25%;
+		}
+		#geo {
+			text-align: left;
+			margin-left: 25%;
+		}
+		#title h1 a {
+			text-shadow: 0px 1px 0px #fff;
+			background-image: -webkit-gradient(linear, left top, left bottom,
+			from(#ccc), to(#999));
+		}
+		#title h1 {
+			text-align: center;
+			margin: 0;
+			padding: 0;
+		}
+		#title h1 a {
+			background-color: #ccc;
+			border-bottom: 1px solid #666;
+			color: #222;
+			display: block;
+			font-size: 20px;
+			font-weight: bold;
+			padding: 10px 0;
+			text-align: center;
+			text-decoration: none;
+		}	
+		#container ul {
+			list-style: none;
+			margin: 10px;
+			padding: 0;
+		}
+		#container ul li a {
+			-webkit-border-bottom-left-radius: 8px;
+			-webkit-border-bottom-right-radius: 8px;
+			-webkit-border-top-left-radius: 8px;
+			-webkit-border-top-right-radius: 8px;
+			background-color: #FFFFFF;
+			border: 1px solid #999999;
+			color: #00688B;
+			display: block;
+			font-size: 17px;
+			font-weight: bold;
+			margin-bottom: -1px;
+			padding: 12px 10px;
+			text-decoration: none;
+		}
+		#container h1 a {
+			text-shadow: 0px 1px 0px #fff;
+			background-image: -webkit-gradient(linear, left top, left bottom,
+			from(#ccc), to(#999));
+		}
+		--></style>
+		
+		<script type="text/javascript">
+        // <![CDATA[
+		
+		// local storage array
+		var spot = new Array();
+		
+        function geo() {
+            // set some geo options
+            var opts = {
+                enableHighAccuracy: true,
+                timeout: 60000,
+                maximumAge: 60000
+            };
+
+            // perform geo lookup, but only if the geolocation object exists
+            if(navigator.geolocation)
+                navigator.geolocation.getCurrentPosition(print_geo, handler, opts);
+            else
+                alert("Geolocation not supported by your browser!");
+        }
+
+        // error handler
+        function handler(err) {
+            switch(err.code) {
+                case err.PERMISSION_DENIED:
+                        alert("This page is not allowed to view your position. Message: " + err.message);
+                        break;
+                case err.POSITION_UNAVAILABLE:
+                        alert("Your position is not available. Message: " + err.message);
+                        break;
+                case err.TIMEOUT:
+                        alert("Timeout when determining your location.");
+                        break; 
+                default:
+                    alert("Unknown error occurred! Message: " + err.message);
+            }
+		}
+
+        // callback function        
+        function print_geo(pos) {
+			// make time stamp a readable format
+            var d = new Date(pos.timestamp);
+
+            // display data
+			$("#geo").hide();
+			$("#geo").fadeIn("600");
+            document.getElementById("geo").innerHTML = 
+                "<br/>Latitude: "        + pos.coords.latitude + "<br />" + 
+                "Longitude: "       + pos.coords.longitude + "<br />" +
+                "Accuracy (in m): " + pos.coords.accuracy + "<br />" +
+                "Timestamp: "       + d.toLocaleString();
+				geo_code(pos);
+		}
+		
+		// geo lookup
+		function geo_code(pos) {
+			var gurl = "http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20json%20where%20url%20%3D%20%22http%3A%2F%2Fmaps.googleapis.com%2Fmaps%2Fapi%2Fgeocode%2Fjson%3Flatlng%3D" + pos.coords.latitude + "%2C" + pos.coords.longitude + "%26sensor%3Dtrue%22&format=json&diagnostics=true";
+			$.getJSON(gurl, function(results) {
+				var tmp = new Array();
+				var zip;
+				// find zip code in results
+				tmp = results.query.results.json.results[0].address_components;
+				if (tmp.length == 9) {
+					zip = results.query.results.json.results[0].address_components[8].long_name;
+				} else if (tmp.length == 8)
+					zip = results.query.results.json.results[0].address_components[7].long_name;
+					
+				$("#foo").hide();
+				$("#foo").fadeIn("600");
+				$("foo").html("Your Location: " + zip);
+				storage(zip);
+				yweath(zip);
+				gnews(zip);
+			});
+		}
+		
+		// weather lookup
+		function yweath(zip) {
+			var yurl = "http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20location%20in%20(select%20id%20from%20xml%20where%20url%3D%22http%3A%2F%2Fxoap.weather.com%2Fsearch%2Fsearch%3Fwhere%3D" + zip + "%22%20and%20itemPath%3D%22search.loc%22)&format=json&diagnostics=true";			
+			$.getJSON(yurl, function(result2) {
+				if (result2.query.results == null) {
+					document.getElementById("news").innerHTML="";
+					return;
+				}
+				if (result2.query.results.channel.length == undefined) {
+					var wtemp = result2.query.results.channel.item.condition.temp;
+					var wtxt = result2.query.results.channel.item.condition.text;
+					var iday = result2.query.results.channel.item.forecast[0].day;
+					var ihigh = result2.query.results.channel.item.forecast[0].high;
+					var ilow = result2.query.results.channel.item.forecast[0].low;
+					var itext = result2.query.results.channel.item.forecast[0].text;
+					var jday = result2.query.results.channel.item.forecast[1].day;
+					var jhigh = result2.query.results.channel.item.forecast[1].high;
+					var jlow = result2.query.results.channel.item.forecast[1].low;
+					var jtext = result2.query.results.channel.item.forecast[1].text;
+					var city = result2.query.results.channel.location.city;
+					var region = result2.query.results.channel.location.region;
+				} else {
+					var wtemp = result2.query.results.channel[0].item.condition.temp;
+					var wtxt = result2.query.results.channel[0].item.condition.text;
+					var iday = result2.query.results.channel[0].item.forecast[0].day;
+					var ihigh = result2.query.results.channel[0].item.forecast[0].high;
+					var ilow = result2.query.results.channel[0].item.forecast[0].low;
+					var itext = result2.query.results.channel[0].item.forecast[0].text;
+					var jday = result2.query.results.channel[0].item.forecast[1].day;
+					var jhigh = result2.query.results.channel[0].item.forecast[1].high;
+					var jlow = result2.query.results.channel[0].item.forecast[1].low;
+					var jtext = result2.query.results.channel[0].item.forecast[1].text;
+					var city = result2.query.results.channel[0].location.city;
+					var region = result2.query.results.channel[0].location.region;
+				}
+				$("#location").hide();
+				$("#location").fadeIn("600");
+				$("#location").html(city + ", " + region);
+				$("#weather").hide();
+				$("#weather").fadeIn("600");
+				$("#weather").html("<br/>Temp: " + wtemp + " degrees<br/>");
+				$("#weather").append("Condition: " + wtxt + "<br/>");
+				$("#weather").append(iday + ": Hi:" + ihigh + " Low:" + ilow + " - " + itext + "<br/>");
+				$("#weather").append(jday + ": Hi:" + jhigh + " Low:" + jlow + " - " + jtext);
+			});
+		}
+	
+		// google news lookup
+		function gnews(zip) {
+			var nurl = "http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20rss%20where%20url%20%3D%20%22http%3A%2F%2Fnews.google.com%2Fnews%3Fgeo%3D" + zip + "%26output%3Drss%22&format=json&diagnostics=true";
+			$.getJSON(nurl, function(result3) {
+				var curr = result3.query.results.item;
+				document.getElementById("news").innerHTML="";
+				$("#news").hide();
+				$("#news").fadeIn("600");
+				for (i in curr) {
+					var title = curr[i].title;
+					var link = curr[i].link;
+					document.getElementById("news").innerHTML += "<li><a href=" + link + " " + "target=_blank>" + title + "</a></li><br/>";
+					
+				}
+			});
+		}
+
+		function storage(zip) {
+			if (localStorage.length != 0) {
+				var local_array = JSON.parse(localStorage['zips']);
+				local_array.push(zip);
+			} else {
+				var local_array = new Array(zip);
+			}
+			
+			localStorage['zips']=JSON.stringify(local_array);
+			$("#foot").html("<p>Previous Searches:</p>");
+			for (i in local_array) {
+				$("#foot").append(decodeURIComponent(local_array[i]) + " ");
+			}
+		}
+		
+		function noshow() {
+			$("#location").hide();
+		}
+		// ]]>
+        </script>
+	</head>
+    <body onload="footer(), noshow()">
+	<div id="title">
+	<h1 id="moblo"> <a href="index.html">Mobile Local</a></h1>
+	</div>
+	<div id="locate">
+	  <input type="submit" value="Locate & Search" onClick="geo()"/>
+	</div>
+	<br/><br/>
+	<div id="search_bar">
+	  Location: <input type="text" id="address" />
+	  <input type="submit" value="Submit" onClick="search()"/>
+	</div>
+	<script>
+	  // bind "enter" to text input
+	  $("#address").bind('keyup',function(e) {
+		if (e.which == "13")
+			search();
+	  });
+	
+	  // clear previous info and lookup text input
+	  function search() {
+		$("#geo").html("");
+		$("#foo").html("");
+		$("#news").html("");
+		var temp = $("#address").val();
+		temp = temp.replace(/ /g,"+");
+		var zip = encodeURIComponent(temp);
+		yweath(zip);
+		gnews(zip);
+		storage(zip);
+	  }
+	</script>
+	<br/>
+	<div id="location">
+	</div>
+	<div id="geo">
+	</div>
+    <div id="weather">
+	</div>
+	<div id="foo">
+	</div>
+	<br/>
+	<div id="container">
+	  <ul>
+	  <div id="news">
+	  </div>
+	  </ul>
+	</div>  
+	<br/><br/>
+	<div id="foot">
+	<script>
+		function footer () {
+			if (localStorage.length != 0) {
+				var foot_array = JSON.parse(localStorage['zips']);
+				$("#foot").html("<p>Previous Searches:</p>");
+			
+				for (i in foot_array)
+					$("#foot").append(decodeURIComponent(foot_array[i]) + " ");
+			}
+		}
+	</script>
+	</div>
+	<div id="clr">
+	  <input type="submit" value="clear history" onClick="clr()"/>
+	  <script>
+		function clr() {
+			localStorage.clear();
+			$("#foot").html("");
+		}
+	  </script>
+	</div>
+	</body>
+</html>
